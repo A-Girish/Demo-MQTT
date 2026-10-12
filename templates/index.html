@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Machine Monitoring - LDR</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: system-ui, sans-serif;
+      background: #111827;
+      color: #f3f4f6;
+      margin: 0;
+      padding: 1.5rem;
+    }
+    h1 {
+      font-weight: 600;
+      margin: 0 0 0.25rem;
+      font-size: 1.5rem;
+    }
+    .status-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: #9ca3af;
+      font-size: 0.9rem;
+      margin-bottom: 1.25rem;
+    }
+    .dot {
+      width: 0.6rem;
+      height: 0.6rem;
+      border-radius: 50%;
+      background: #6b7280;
+      flex-shrink: 0;
+      transition: background 0.2s ease;
+    }
+    .dot.live { background: #22c55e; }
+    .dot.stale { background: #f59e0b; }
+    .dot.error { background: #ef4444; }
+
+    .stats {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+    .stat-card {
+      background: #1f2937;
+      border-radius: 12px;
+      padding: 0.75rem 1.25rem;
+      min-width: 110px;
+    }
+    .stat-card .label {
+      color: #9ca3af;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .stat-card .value {
+      font-size: 1.75rem;
+      font-weight: 700;
+      margin-top: 0.1rem;
+    }
+    .stat-card.current .value { color: #38bdf8; }
+
+    .chart-container {
+      position: relative;
+      background: #1f2937;
+      border-radius: 12px;
+      padding: 1rem;
+      max-width: 900px;
+      height: 320px;
+    }
+  </style>
+</head>
+<body>
+  <h1>LDR Live Reading</h1>
+  <div class="status-row">
+    <span class="dot" id="status-dot"></span>
+    <span id="status">Connecting…</span>
+  </div>
+
+  <div class="stats">
+    <div class="stat-card current">
+      <div class="label">Current</div>
+      <div class="value" id="stat-current">--</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Min</div>
+      <div class="value" id="stat-min">--</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Max</div>
+      <div class="value" id="stat-max">--</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Avg</div>
+      <div class="value" id="stat-avg">--</div>
+    </div>
+  </div>
+
+  <div class="chart-container">
+    <canvas id="chart"></canvas>
+  </div>
+
+  <script>
+    const POLL_INTERVAL_MS = 1000;
+    const STALE_AFTER_MS = 5000;
+
+    const statusEl = document.getElementById('status');
+    const dotEl = document.getElementById('status-dot');
+    const currentEl = document.getElementById('stat-current');
+    const minEl = document.getElementById('stat-min');
+    const maxEl = document.getElementById('stat-max');
+    const avgEl = document.getElementById('stat-avg');
+
+    const chart = new Chart(document.getElementById('chart').getContext('2d'), {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [{
+          label: 'LDR value',
+          data: [],
+          borderColor: '#38bdf8',
+          backgroundColor: 'rgba(56, 189, 248, 0.15)',
+          tension: 0.25,
+          pointRadius: 0,
+          borderWidth: 2,
+          fill: true,
+        }]
+      },
+      options: {
+        animation: false,
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { intersect: false, mode: 'index' },
+        scales: {
+          x: {
+            ticks: { color: '#9ca3af', maxTicksLimit: 8, autoSkip: true },
+            grid: { color: '#374151' },
+          },
+          y: {
+            ticks: { color: '#9ca3af' },
+            grid: { color: '#374151' },
+          },
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              title: (items) => items[0]?.label ?? '',
+            },
+          },
+        },
+      },
+    });
+
+    let lastTimestamp = null;
+    let staleTimer = null;
+
+    function setDotState(state) {
+      dotEl.className = 'dot' + (state ? ' ' + state : '');
+    }
+
+    function scheduleStaleCheck() {
+      clearTimeout(staleTimer);
+      staleTimer = setTimeout(() => {
+        setDotState('stale');
+        statusEl.textContent = 'No new data for a while…';
+      }, STALE_AFTER_MS);
+    }
+
+    function updateStats(values) {
+      const min = Math.min(...values);
+      const max = Math.max(...values);
+      const avg = values.reduce((a, b) => a + b, 0) / values.length;
+      minEl.textContent = min;
+      maxEl.textContent = max;
+      avgEl.textContent = avg.toFixed(1);
+    }
+
+    async function poll() {
+      try {
+        const res = await fetch('/data');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const points = await res.json();
+
+        if (points.length === 0) {
+          setDotState();
+          statusEl.textContent = 'Waiting for data…';
+          return;
+        }
+
+        const values = points.map((p) => p.value);
+        chart.data.labels = points.map((p) => new Date(p.t * 1000).toLocaleTimeString());
+        chart.data.datasets[0].data = values;
+        chart.update('none');
+
+        updateStats(values);
+
+        const last = points[points.length - 1];
+        currentEl.textContent = last.value;
+
+        if (last.t !== lastTimestamp) {
+          lastTimestamp = last.t;
+          setDotState('live');
+          statusEl.textContent = 'Last update: ' + new Date(last.t * 1000).toLocaleTimeString();
+          scheduleStaleCheck();
+        }
+      } catch (e) {
+        setDotState('error');
+        statusEl.textContent = 'Connection error, retrying…';
+      }
+    }
+
+    poll();
+    setInterval(poll, POLL_INTERVAL_MS);
+  </script>
+</body>
+</html>
