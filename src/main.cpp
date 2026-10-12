@@ -13,6 +13,7 @@ const char* MQTT_CLIENT_ID = "Girish";
 
 // --- LDR ---
 const int LDR_PIN = 34; // GPIO4 / "34" on ESP32
+const int LED_BUILTIN = 2; // GPIO2 / "2" on ESP32
 
 WiFiClient espClient;
 PubSubClient mqttClient(espClient);
@@ -29,8 +30,10 @@ void connectWiFi() {
 void connectMQTT() {
   while (!mqttClient.connected()) {
     Serial.print("Connecting to MQTT...");
+    
     if (mqttClient.connect(MQTT_CLIENT_ID)) {
       Serial.println("connected");
+      mqttClient.subscribe("machinemonitoring/LED/Girish");
     } else {
       Serial.print("failed, rc=");
       Serial.print(mqttClient.state());
@@ -40,10 +43,35 @@ void connectMQTT() {
   }
 }
 
+void callback(char* topic, byte* payload, unsigned int length){
+  Serial.print("Topic:");
+  Serial.print(topic);
+  Serial.print(" Message:");
+  String ledCommand = "";
+  for (unsigned int i = 0; i < length; i++) {
+    ledCommand += (char)payload[i];
+  }
+
+  if (ledCommand == "on") {
+    digitalWrite(2, HIGH);
+  }
+  else if (ledCommand == "off") {
+    digitalWrite(2, LOW);
+    
+  }
+
+  for (unsigned int i = 0; i < length; i++) {
+    Serial.print((char)payload[i]); 
+  }
+  Serial.println();
+}
+
 void setup() {
   Serial.begin(115200);
   connectWiFi();
   mqttClient.setServer(MQTT_BROKER, MQTT_PORT);
+  mqttClient.setCallback(callback);
+  pinMode(LED_BUILTIN, OUTPUT);
 }
 
 void loop() {
