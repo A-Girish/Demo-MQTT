@@ -3,219 +3,342 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Machine Monitoring - LDR</title>
+  <meta name="theme-color" content="#f4f6f2">
+  <title>Machine Monitor | LDR</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
   <style>
+    :root {
+      color-scheme: light;
+      --ink: #17241f;
+      --muted: #77827c;
+      --paper: #f4f6f2;
+      --surface: #fff;
+      --line: #e7ebe6;
+      --green: #28795c;
+      --green-soft: #e8f3ed;
+      --shadow: 0 12px 34px rgba(26, 45, 35, .055);
+    }
     * { box-sizing: border-box; }
     body {
-      font-family: system-ui, sans-serif;
-      background: #111827;
-      color: #f3f4f6;
       margin: 0;
-      padding: 1.5rem;
+      min-height: 100vh;
+      background: var(--paper);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      -webkit-font-smoothing: antialiased;
     }
-    h1 {
-      font-weight: 600;
-      margin: 0 0 0.25rem;
-      font-size: 1.5rem;
-    }
-    .status-row {
+    .topbar {
+      height: 76px;
+      padding: 0 clamp(1.25rem, 5vw, 5rem);
       display: flex;
       align-items: center;
-      gap: 0.5rem;
-      color: #9ca3af;
-      font-size: 0.9rem;
-      margin-bottom: 1.25rem;
+      justify-content: space-between;
+      background: rgba(255,255,255,.88);
+      border-bottom: 1px solid var(--line);
     }
-    .dot {
-      width: 0.6rem;
-      height: 0.6rem;
-      border-radius: 50%;
-      background: #6b7280;
-      flex-shrink: 0;
-      transition: background 0.2s ease;
+    .brand { display: flex; align-items: center; gap: .8rem; font-weight: 700; letter-spacing: -.025em; }
+    .brand-mark {
+      width: 36px; height: 36px; display: grid; place-items: center;
+      border-radius: 11px; color: #fff; background: var(--green);
     }
-    .dot.live { background: #22c55e; }
-    .dot.stale { background: #f59e0b; }
-    .dot.error { background: #ef4444; }
-
-    .stats {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 1rem;
-      margin-bottom: 1.5rem;
+    .brand-mark svg { width: 20px; height: 20px; }
+    .topbar-note { color: var(--muted); font-size: .85rem; }
+    main { width: min(1120px, calc(100% - 2.5rem)); margin: 0 auto; padding: 3rem 0 4rem; }
+    .eyebrow { color: var(--green); font-size: .72rem; font-weight: 750; letter-spacing: .14em; text-transform: uppercase; }
+    .page-heading { display: flex; align-items: end; justify-content: space-between; gap: 1rem; margin-bottom: 2rem; }
+    h1 { margin: .45rem 0 .4rem; font-size: clamp(2rem, 4vw, 2.65rem); line-height: 1.1; letter-spacing: -.055em; }
+    .subtitle { margin: 0; color: var(--muted); font-size: .96rem; }
+    .connection {
+      display: inline-flex; align-items: center; gap: .55rem; flex-shrink: 0;
+      padding: .62rem .9rem; border: 1px solid var(--line); border-radius: 999px;
+      background: var(--surface); color: #64716a; font-size: .8rem; font-weight: 650;
     }
-    .stat-card {
-      background: #1f2937;
-      border-radius: 12px;
-      padding: 0.75rem 1.25rem;
-      min-width: 110px;
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: #aab3ad; transition: background .2s; }
+    .dot.live { background: #28a36b; box-shadow: 0 0 0 3px #28a36b1c; }
+    .dot.stale { background: #d3932b; box-shadow: 0 0 0 3px #d3932b1c; }
+    .dot.error { background: #d45555; box-shadow: 0 0 0 3px #d455551c; }
+    .stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1rem; margin-bottom: 1rem; }
+    .stat-card, .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); }
+    .stat-card { min-height: 138px; padding: 1.25rem 1.4rem; }
+    .stat-top { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
+    .stat-label { color: var(--muted); font-size: .82rem; font-weight: 600; }
+    .stat-icon { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 9px; background: #f2f5f2; color: #79877f; font-size: .88rem; }
+    .stat-value { margin-top: 1rem; font-size: 2rem; line-height: 1; font-weight: 720; letter-spacing: -.055em; font-variant-numeric: tabular-nums; }
+    .stat-card.current { border-color: #cfe4d8; background: linear-gradient(145deg, #fff 48%, #f0f8f3); }
+    .stat-card.current .stat-icon { color: var(--green); background: var(--green-soft); }
+    .unit { margin-left: .35rem; color: var(--muted); font-size: .8rem; font-weight: 550; letter-spacing: 0; }
+    .panel { overflow: hidden; }
+    .panel-heading { min-height: 76px; padding: 1.1rem 1.5rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; border-bottom: 1px solid var(--line); }
+    h2 { margin: 0; font-size: 1rem; letter-spacing: -.02em; }
+    .panel-caption { margin: .3rem 0 0; color: var(--muted); font-size: .78rem; }
+    .range-label { display: inline-flex; align-items: center; gap: .4rem; color: var(--muted); font-size: .76rem; }
+    .range-label::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--green); }
+    .panel-tools { display: flex; align-items: center; gap: 1rem; }
+    .range-controls { display: inline-flex; padding: 3px; gap: 2px; background: #f2f5f2; border-radius: 9px; }
+    .range-button { border: 0; border-radius: 7px; padding: .4rem .62rem; background: transparent; color: var(--muted); font: inherit; font-size: .72rem; font-weight: 650; cursor: pointer; }
+    .range-button:hover { color: var(--ink); }
+    .range-button.active { color: var(--green); background: #fff; box-shadow: 0 1px 3px #17241f18; }
+    .range-button:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+    .download-button { display: inline-flex; align-items: center; gap: .4rem; padding: .48rem .72rem; border: 1px solid var(--line); border-radius: 9px; background: #fff; color: #536159; font: inherit; font-size: .74rem; font-weight: 650; cursor: pointer; white-space: nowrap; }
+    .download-button:hover:not(:disabled) { border-color: #b8d3c3; color: var(--green); background: #f8fbf9; }
+    .download-button:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+    .chart-wrap { position: relative; height: 350px; padding: 1.25rem 1.5rem 1rem; }
+    .empty-state { position: absolute; inset: 1rem; display: grid; place-items: center; text-align: center; }
+    .empty-state[hidden] { display: none; }
+    .empty-content { max-width: 390px; padding: 1.25rem; }
+    .empty-icon { width: 42px; height: 42px; margin: 0 auto .85rem; display: grid; place-items: center; border-radius: 13px; background: var(--green-soft); color: var(--green); font-size: 1.25rem; }
+    .empty-content h3 { margin: 0 0 .45rem; font-size: .98rem; }
+    .empty-content p { margin: 0; color: var(--muted); font-size: .82rem; line-height: 1.6; }
+    .footer { display: flex; justify-content: space-between; gap: 1rem; padding: 1rem 1.5rem; border-top: 1px solid var(--line); color: var(--muted); font-size: .76rem; }
+    .footer strong { color: #536159; font-weight: 650; }
+    @media (max-width: 720px) {
+      .topbar { height: 64px; }
+      .topbar-note { display: none; }
+      main { padding-top: 2.25rem; }
+      .page-heading { align-items: start; flex-direction: column; margin-bottom: 1.5rem; }
+      .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .7rem; }
+      .stat-card { min-height: 122px; padding: 1rem; }
+      .stat-value { font-size: 1.75rem; }
+      .chart-wrap { height: 290px; padding: 1rem .85rem; }
+      .panel-heading, .footer { padding-left: 1rem; padding-right: 1rem; }
+      .panel-heading { align-items: flex-start; flex-direction: column; }
+      .panel-tools { width: 100%; justify-content: space-between; }
     }
-    .stat-card .label {
-      color: #9ca3af;
-      font-size: 0.75rem;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-    }
-    .stat-card .value {
-      font-size: 1.75rem;
-      font-weight: 700;
-      margin-top: 0.1rem;
-    }
-    .stat-card.current .value { color: #38bdf8; }
-
-    .chart-container {
-      position: relative;
-      background: #1f2937;
-      border-radius: 12px;
-      padding: 1rem;
-      max-width: 900px;
-      height: 320px;
-    }
+    @media (max-width: 380px) { main { width: calc(100% - 1.5rem); } .stats { gap: .55rem; } }
   </style>
 </head>
 <body>
-  <h1>LDR Live Reading</h1>
-  <div class="status-row">
-    <span class="dot" id="status-dot"></span>
-    <span id="status">Connecting…</span>
-  </div>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M3 13h4l2.2-6 4.1 11 2.1-5H21" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </span>
+      <span>Machine Monitor</span>
+    </div>
+    <div class="topbar-note">Live sensor dashboard</div>
+  </header>
 
-  <div class="stats">
-    <div class="stat-card current">
-      <div class="label">Current</div>
-      <div class="value" id="stat-current">--</div>
-    </div>
-    <div class="stat-card">
-      <div class="label">Min</div>
-      <div class="value" id="stat-min">--</div>
-    </div>
-    <div class="stat-card">
-      <div class="label">Max</div>
-      <div class="value" id="stat-max">--</div>
-    </div>
-    <div class="stat-card">
-      <div class="label">Avg</div>
-      <div class="value" id="stat-avg">--</div>
-    </div>
-  </div>
+  <main>
+    <section class="page-heading" aria-labelledby="page-title">
+      <div>
+        <div class="eyebrow">Sensor overview</div>
+        <h1 id="page-title">LDR readings</h1>
+        <p class="subtitle">Light sensor activity from your connected device.</p>
+      </div>
+      <div class="connection" role="status" aria-live="polite">
+        <span class="dot" id="status-dot"></span>
+        <span id="status">Connecting...</span>
+      </div>
+    </section>
 
-  <div class="chart-container">
-    <canvas id="chart"></canvas>
-  </div>
+    <section class="stats" aria-label="Reading summary">
+      <article class="stat-card current">
+        <div class="stat-top"><span class="stat-label">Current reading</span><span class="stat-icon" aria-hidden="true">◉</span></div>
+        <div class="stat-value"><span id="stat-current">--</span><span class="unit">ADC</span></div>
+      </article>
+      <article class="stat-card">
+        <div class="stat-top"><span class="stat-label">Minimum</span><span class="stat-icon" aria-hidden="true">↓</span></div>
+        <div class="stat-value" id="stat-min">--</div>
+      </article>
+      <article class="stat-card">
+        <div class="stat-top"><span class="stat-label">Maximum</span><span class="stat-icon" aria-hidden="true">↑</span></div>
+        <div class="stat-value" id="stat-max">--</div>
+      </article>
+      <article class="stat-card">
+        <div class="stat-top"><span class="stat-label">Average</span><span class="stat-icon" aria-hidden="true">∿</span></div>
+        <div class="stat-value" id="stat-avg">--</div>
+      </article>
+    </section>
+
+    <section class="panel" aria-labelledby="chart-title">
+      <div class="panel-heading">
+        <div><h2 id="chart-title">Reading history</h2><p class="panel-caption">Recent sensor values over time</p></div>
+        <div class="panel-tools">
+          <div class="range-controls" role="group" aria-label="Chart time range">
+            <button class="range-button" type="button" data-range="60" aria-pressed="false">1 min</button>
+            <button class="range-button active" type="button" data-range="300" aria-pressed="true">5 min</button>
+            <button class="range-button" type="button" data-range="all" aria-pressed="false">All</button>
+          </div>
+          <span class="range-label" id="range-label">Last 5 minutes</span>
+          <button class="download-button" id="download-csv" type="button" aria-label="Download visible readings as CSV"><span aria-hidden="true">↓</span> CSV</button>
+        </div>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="chart" aria-label="Chart of recent LDR readings" role="img"></canvas>
+        <div class="empty-state" id="empty-state" hidden>
+          <div class="empty-content">
+            <div class="empty-icon" aria-hidden="true">~</div>
+            <h3>Waiting for your first reading</h3>
+            <p>Check that your device is powered on, connected to Wi-Fi, and publishing to <strong>machinemonitoring/ldr</strong>.</p>
+          </div>
+        </div>
+      </div>
+      <div class="footer"><span>Topic <strong>machinemonitoring/ldr</strong></span><span id="last-update">Last message: waiting</span></div>
+    </section>
+  </main>
 
   <script>
     const POLL_INTERVAL_MS = 1000;
     const STALE_AFTER_MS = 5000;
-
     const statusEl = document.getElementById('status');
     const dotEl = document.getElementById('status-dot');
     const currentEl = document.getElementById('stat-current');
     const minEl = document.getElementById('stat-min');
     const maxEl = document.getElementById('stat-max');
     const avgEl = document.getElementById('stat-avg');
+    const lastUpdateEl = document.getElementById('last-update');
+    const emptyStateEl = document.getElementById('empty-state');
+    const rangeLabelEl = document.getElementById('range-label');
+    const rangeButtons = document.querySelectorAll('.range-button');
+    const downloadButton = document.getElementById('download-csv');
+    let selectedRange = 300;
+    let allPoints = [];
 
-    const chart = new Chart(document.getElementById('chart').getContext('2d'), {
+    const chart = new Chart(document.getElementById('chart'), {
       type: 'line',
-      data: {
-        labels: [],
-        datasets: [{
-          label: 'LDR value',
-          data: [],
-          borderColor: '#38bdf8',
-          backgroundColor: 'rgba(56, 189, 248, 0.15)',
-          tension: 0.25,
-          pointRadius: 0,
-          borderWidth: 2,
-          fill: true,
-        }]
-      },
+      data: { labels: [], datasets: [{
+        label: 'LDR value', data: [], borderColor: '#28795c',
+        backgroundColor: (context) => {
+          const { chartArea, ctx } = context.chart;
+          if (!chartArea) return 'rgba(40, 121, 92, .12)';
+          const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+          gradient.addColorStop(0, 'rgba(40, 121, 92, .18)');
+          gradient.addColorStop(1, 'rgba(40, 121, 92, .015)');
+          return gradient;
+        },
+        tension: .32, pointRadius: 0, pointHitRadius: 12, borderWidth: 2.5, fill: true,
+      }] },
       options: {
-        animation: false,
-        responsive: true,
-        maintainAspectRatio: false,
+        animation: false, responsive: true, maintainAspectRatio: false,
         interaction: { intersect: false, mode: 'index' },
         scales: {
-          x: {
-            ticks: { color: '#9ca3af', maxTicksLimit: 8, autoSkip: true },
-            grid: { color: '#374151' },
-          },
-          y: {
-            ticks: { color: '#9ca3af' },
-            grid: { color: '#374151' },
-          },
+          x: { ticks: { color: '#89948d', maxTicksLimit: 7, autoSkip: true, maxRotation: 0 }, grid: { display: false }, border: { color: '#e7ebe6' } },
+          y: { ticks: { color: '#89948d', maxTicksLimit: 5 }, grid: { color: '#edf0ed' }, border: { display: false } },
         },
         plugins: {
           legend: { display: false },
-          tooltip: {
-            callbacks: {
-              title: (items) => items[0]?.label ?? '',
-            },
-          },
+          tooltip: { backgroundColor: '#17241f', padding: 11, cornerRadius: 9, displayColors: false,
+            titleColor: '#c8d5ce', bodyColor: '#fff', callbacks: { label: (item) => ` ${item.formattedValue} ADC` } },
         },
       },
     });
 
     let lastTimestamp = null;
     let staleTimer = null;
-
-    function setDotState(state) {
-      dotEl.className = 'dot' + (state ? ' ' + state : '');
-    }
-
+    function setDotState(state) { dotEl.className = 'dot' + (state ? ' ' + state : ''); }
     function scheduleStaleCheck() {
       clearTimeout(staleTimer);
-      staleTimer = setTimeout(() => {
+      const ageMs = lastTimestamp === null ? 0 : Date.now() - lastTimestamp * 1000;
+      const markStale = () => {
         setDotState('stale');
-        statusEl.textContent = 'No new data for a while…';
-      }, STALE_AFTER_MS);
+        statusEl.textContent = 'Data is delayed';
+      };
+      if (ageMs >= STALE_AFTER_MS) markStale();
+      else staleTimer = setTimeout(markStale, STALE_AFTER_MS - ageMs);
     }
-
     function updateStats(values) {
-      const min = Math.min(...values);
-      const max = Math.max(...values);
-      const avg = values.reduce((a, b) => a + b, 0) / values.length;
-      minEl.textContent = min;
-      maxEl.textContent = max;
-      avgEl.textContent = avg.toFixed(1);
+      if (!values.length) {
+        currentEl.textContent = '--';
+        minEl.textContent = '--';
+        maxEl.textContent = '--';
+        avgEl.textContent = '--';
+        return;
+      }
+      minEl.textContent = Math.min(...values);
+      maxEl.textContent = Math.max(...values);
+      avgEl.textContent = (values.reduce((sum, value) => sum + value, 0) / values.length).toFixed(1);
     }
-
+    function visiblePoints() {
+      if (selectedRange === 'all' || !allPoints.length) return allPoints;
+      const cutoff = Date.now() / 1000 - selectedRange;
+      return allPoints.filter((point) => point.t >= cutoff);
+    }
+    function renderPoints() {
+      const points = visiblePoints();
+      const values = points.map((point) => point.value);
+      chart.data.labels = points.map((point) => new Date(point.t * 1000).toLocaleTimeString());
+      chart.data.datasets[0].data = values;
+      chart.update('none');
+      updateStats(values);
+      emptyStateEl.hidden = values.length > 0;
+      emptyStateEl.querySelector('h3').textContent = allPoints.length
+        ? 'No readings in this time range'
+        : 'Waiting for your first reading';
+      emptyStateEl.querySelector('p').textContent = allPoints.length
+        ? 'Try a wider time range to see older sensor readings.'
+        : 'Check that your device is powered on, connected to Wi-Fi, and publishing to machinemonitoring/ldr.';
+    }
+    function updateMessageAge() {
+      if (lastTimestamp === null) return;
+      const seconds = Math.max(0, Math.floor(Date.now() / 1000 - lastTimestamp));
+      lastUpdateEl.textContent = seconds < 2 ? 'Last message: just now' : `Last message: ${seconds}s ago`;
+    }
+    downloadButton.addEventListener('click', () => {
+      const points = visiblePoints();
+      const rows = [['timestamp', 'ldr_value_adc'], ...points.map((point) => [
+        new Date(point.t * 1000).toISOString(), point.value,
+      ])];
+      const csv = rows.map((row) => row.join(',')).join('\r\n');
+      const url = URL.createObjectURL(new Blob(['\uFEFF', csv], { type: 'text/csv;charset=utf-8' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `ldr-readings-${new Date().toISOString().replace(/[:.]/g, '-')}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    });
+    rangeButtons.forEach((button) => {
+      button.addEventListener('click', () => {
+        selectedRange = button.dataset.range === 'all' ? 'all' : Number(button.dataset.range);
+        rangeButtons.forEach((item) => {
+          const active = item === button;
+          item.classList.toggle('active', active);
+          item.setAttribute('aria-pressed', String(active));
+        });
+        updateRangeLabel();
+        renderPoints();
+      });
+    });
+    function updateRangeLabel() {
+      rangeLabelEl.textContent = selectedRange === 'all'
+        ? `All ${allPoints.length} readings`
+        : `Last ${selectedRange / 60} minutes`;
+    }
     async function poll() {
       try {
-        const res = await fetch('/data');
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const points = await res.json();
-
+        const response = await fetch('/data');
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const points = await response.json();
         if (points.length === 0) {
+          allPoints = [];
+          renderPoints();
           setDotState();
-          statusEl.textContent = 'Waiting for data…';
+          statusEl.textContent = 'Waiting for sensor data';
+          lastTimestamp = null;
+          lastUpdateEl.textContent = 'Last message: waiting';
           return;
         }
-
-        const values = points.map((p) => p.value);
-        chart.data.labels = points.map((p) => new Date(p.t * 1000).toLocaleTimeString());
-        chart.data.datasets[0].data = values;
-        chart.update('none');
-
-        updateStats(values);
-
-        const last = points[points.length - 1];
-        currentEl.textContent = last.value;
-
-        if (last.t !== lastTimestamp) {
-          lastTimestamp = last.t;
+        allPoints = points;
+        updateRangeLabel();
+        renderPoints();
+        const latest = points[points.length - 1];
+        currentEl.textContent = latest.value;
+        if (latest.t !== lastTimestamp) {
+          lastTimestamp = latest.t;
           setDotState('live');
-          statusEl.textContent = 'Last update: ' + new Date(last.t * 1000).toLocaleTimeString();
+          statusEl.textContent = 'Receiving data';
           scheduleStaleCheck();
         }
-      } catch (e) {
+        updateMessageAge();
+      } catch (error) {
         setDotState('error');
-        statusEl.textContent = 'Connection error, retrying…';
+        statusEl.textContent = 'Connection error - retrying';
       }
     }
-
     poll();
     setInterval(poll, POLL_INTERVAL_MS);
+    setInterval(updateMessageAge, 1000);
   </script>
 </body>
 </html>
